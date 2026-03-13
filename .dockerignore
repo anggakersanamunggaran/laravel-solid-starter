@@ -1,0 +1,29 @@
+# Version control
+.git
+.gitignore
+
+# Dependency directories — vendor is installed in the build stage
+vendor
+node_modules
+
+# Local environment files — never bake secrets into the image
+.env
+.env.*
+!.env.example
+
+# Development tooling
+.idea
+.vscode
+.phpunit.cache
+*.log
+
+# Docker compose files (not needed inside the image)
+docker-compose.yml
+docker-compose*.yml
+
+# Test artifacts
+/tests
+
+# Documentation
+*.md
+README*
