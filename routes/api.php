@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,7 +18,10 @@ use Illuminate\Support\Facades\Route;
 */
 
 // ── Public ────────────────────────────────────────────────────────────────
-Route::prefix('users')->name('users.')->group(function () {
-    Route::post('/', [UserController::class, 'store'])->name('store');
-    Route::get('/',  [UserController::class, 'index'])->name('index');
+Route::post('/login', [AuthController::class, 'login'])->name('login');
+
+// ── Protected (Sanctum token required) ────────────────────────────────────
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::get('/users',  [UserController::class, 'index'])->name('users.index');
 });

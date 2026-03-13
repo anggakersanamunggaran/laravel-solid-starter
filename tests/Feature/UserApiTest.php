@@ -34,11 +34,14 @@ class UserApiTest extends TestCase
     {
         Mail::fake();
 
-        $response = $this->postJson('/api/users', [
-            'name'     => 'Jane Doe',
-            'email'    => 'jane@example.com',
-            'password' => 'secret123',
-        ]);
+        $actor = User::factory()->admin()->create(['active' => true]);
+
+        $response = $this->actingAs($actor, 'sanctum')
+                         ->postJson('/api/users', [
+                             'name'     => 'Jane Doe',
+                             'email'    => 'jane@example.com',
+                             'password' => 'secret123',
+                         ]);
 
         $response->assertStatus(201)
                  ->assertJsonStructure([
@@ -59,11 +62,14 @@ class UserApiTest extends TestCase
     /** @test */
     public function test_create_user_fails_with_invalid_email(): void
     {
-        $response = $this->postJson('/api/users', [
-            'name'     => 'Bad Email User',
-            'email'    => 'not-an-email',
-            'password' => 'secret123',
-        ]);
+        $actor = User::factory()->admin()->create(['active' => true]);
+
+        $response = $this->actingAs($actor, 'sanctum')
+                         ->postJson('/api/users', [
+                             'name'     => 'Bad Email User',
+                             'email'    => 'not-an-email',
+                             'password' => 'secret123',
+                         ]);
 
         $response->assertStatus(422)
                  ->assertJsonValidationErrors(['email']);
@@ -72,11 +78,14 @@ class UserApiTest extends TestCase
     /** @test */
     public function test_create_user_fails_with_short_password(): void
     {
-        $response = $this->postJson('/api/users', [
-            'name'     => 'Short Pass',
-            'email'    => 'short@example.com',
-            'password' => '1234567',   // 7 chars — one below the 8-char minimum
-        ]);
+        $actor = User::factory()->admin()->create(['active' => true]);
+
+        $response = $this->actingAs($actor, 'sanctum')
+                         ->postJson('/api/users', [
+                             'name'     => 'Short Pass',
+                             'email'    => 'short@example.com',
+                             'password' => '1234567',   // 7 chars — one below the 8-char minimum
+                         ]);
 
         $response->assertStatus(422)
                  ->assertJsonValidationErrors(['password']);
@@ -87,11 +96,14 @@ class UserApiTest extends TestCase
     {
         Mail::fake();
 
-        $this->postJson('/api/users', [
-            'name'     => 'Mail Test User',
-            'email'    => 'mailtest@example.com',
-            'password' => 'secret123',
-        ])->assertStatus(201);
+        $actor = User::factory()->admin()->create(['active' => true]);
+
+        $this->actingAs($actor, 'sanctum')
+             ->postJson('/api/users', [
+                 'name'     => 'Mail Test User',
+                 'email'    => 'mailtest@example.com',
+                 'password' => 'secret123',
+             ])->assertStatus(201);
 
         Mail::assertQueued(WelcomeUserMail::class, function (WelcomeUserMail $mail) {
             return $mail->user->email === 'mailtest@example.com';

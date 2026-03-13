@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use App\Exceptions\DuplicateEmailException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 
@@ -34,6 +35,13 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             //
+        });
+
+        $this->renderable(function (DuplicateEmailException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'error'   => 'duplicate_email',
+            ], 409);
         });
     }
 }

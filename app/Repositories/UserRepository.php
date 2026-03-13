@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Contracts\Repositories\UserRepositoryInterface;
+use App\DataTransferObjects\CreateUserData;
+use App\Exceptions\DuplicateEmailException;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
 
-class UserRepository
+class UserRepository implements UserRepositoryInterface
 {
     public function __construct(
         private readonly User $model
@@ -16,18 +20,26 @@ class UserRepository
     /**
      * Persist a new user record and return the created model instance.
      *
-     * The password is hashed here at the persistence boundary so the Service
+     * The password is hashed here at the persistence boundary so the Action
      * layer never needs to be aware of the hashing strategy — a clean
      * application of the Single Responsibility Principle.
-     *
-     * @param  array<string, mixed>  $data
      */
-    public function create(array $data): User
+    public function create(CreateUserData $data): User
     {
-        return $this->model->create([
-            ...$data,
-            'password' => bcrypt($data['password']),
-        ])->fresh();
+        try {
+            return $this->model->create([
+                'name'     => $data->name,
+                'email'    => $data->email,
+                'password' => bcrypt($data->password),
+                'role'     => $data->role,
+            ])->fresh();
+        } catch (QueryException $e) {
+            if ($e->errorInfo[1] === 1062) {
+                throw new DuplicateEmailException($data->email);
+            }
+
+            throw $e;
+        }
     }
 
     /**

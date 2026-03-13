@@ -1,8 +1,25 @@
 # laravel-solid-starter
 
-A clean starting point for building REST APIs with Laravel 12. The main goal here was to enforce proper separation of concerns from day one — slim controllers, a real service layer, repository pattern, the works — so you're not refactoring architectural mistakes six months in.
+A clean starting point for building REST APIs with Laravel 12 — with slim controllers, a real service layer, repository pattern with contracts, typed DTOs, action classes, and custom exceptions, so the foundation stays solid as the project grows.
 
 **Stack:** Laravel 12 · PHP 8.2 · MySQL 8 · Laravel Sanctum · Docker
+
+---
+
+## Table of Contents
+
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Services](#services)
+- [Postman Collection](#postman-collection)
+- [API Endpoints](#api-endpoints)
+  - [`POST /api/login` — Get Token](#post-apilogin--get-token)
+  - [`POST /api/users` — Create User](#post-apiusers--create-user)
+  - [`GET /api/users` — List Users](#get-apiusers--list-users)
+- [Useful Commands](#useful-commands)
+- [Project Structure](#project-structure)
+- [Architecture Decisions](#architecture-decisions)
+- [About](#about)
 
 ---
 
@@ -61,16 +78,65 @@ Password: secret
 
 ---
 
+## Postman Collection
+
+A ready-to-use Postman collection with all endpoints and an environment pre-configured for `http://localhost:8080`:
+
+[Open in Postman](https://galactic-meteor-165767.postman.co/workspace/My-Workspace~53558f2b-37bf-4818-89d4-cf6a59c6cf97/collection/5356953-b5cc7e84-954d-4f33-a345-997d734be6f8?action=share&creator=5356953&active-environment=5356953-490be36c-c68a-45f7-b918-08bbf347a6f4)
+
+---
+
 ## API Endpoints
 
 One thing to keep in mind: always send `Accept: application/json` on every request. Without it, Laravel will return an HTML redirect on validation failures instead of a JSON error — which is confusing and almost certainly not what you want.
 
+### `POST /api/login` — Get Token
+
+Required to see `can_edit` on `GET /api/users`. The seeder creates users with password `password`.
+
+```bash
+curl -s -X POST http://localhost:8080/api/login \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"email":"admin@example.com","password":"password"}'
+```
+
+**Response `200 OK`:**
+```json
+{
+  "token": "1|abc123...",
+  "user": {
+    "id": 1,
+    "name": "Admin",
+    "email": "admin@example.com",
+    "role": "admin"
+  }
+}
+```
+
+**Response `401 Unauthorized`:**
+```json
+{
+  "message": "Invalid credentials."
+}
+```
+
+Use the token as a Bearer header on subsequent requests:
+```bash
+-H "Authorization: Bearer 1|abc123..."
+```
+
+---
+
 ### `POST /api/users` — Create User
+
+**Requires authentication.**
 
 ```bash
 curl -s -X POST http://localhost:8080/api/users \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
+  -H "Authorization: Bearer 1|abc123..." \
   -d '{"email":"john@example.com","password":"secret123","name":"John Doe"}'
 ```
 
@@ -80,7 +146,16 @@ curl -s -X POST http://localhost:8080/api/users \
   "id": 1,
   "email": "john@example.com",
   "name": "John Doe",
+  "role": "user",
   "created_at": "2024-11-25T12:34:56+00:00"
+}
+```
+
+**Response `409 Conflict` (duplicate email):**
+```json
+{
+  "message": "The email address [john@example.com] is already registered.",
+  "error": "duplicate_email"
 }
 ```
 
@@ -88,8 +163,12 @@ curl -s -X POST http://localhost:8080/api/users \
 
 ### `GET /api/users` — List Users
 
+**Requires authentication.** Get a token first via `POST /api/login`.
+
 ```bash
-curl -s "http://localhost:8080/api/users?search=john&sortBy=name&page=1"
+curl -s "http://localhost:8080/api/users?search=john&sortBy=name&page=1" \
+  -H "Authorization: Bearer 1|abc123..." \
+  -H "Accept: application/json"
 ```
 
 Supported query params:
@@ -107,7 +186,6 @@ Supported query params:
   "users": [
     {
       "id": 1,
-      "email": "john@example.com",
       "name": "John Doe",
       "role": "user",
       "created_at": "2024-11-25T12:34:56+00:00",
@@ -117,6 +195,8 @@ Supported query params:
   ]
 }
 ```
+
+`email` is intentionally absent — bulk-listing emails is a PII risk. The `id` remains so the frontend can link to a user's profile page.
 
 ---
 
@@ -160,22 +240,41 @@ docker compose down -v
 
 ```
 app/
-├── Enums/UserRole.php              # Backed enum: admin | manager | user
+├── Actions/
+│   └── CreateUserAction.php            # Write use-case — owns the "create user" flow
+├── Contracts/
+│   └── Repositories/
+│       └── UserRepositoryInterface.php # Abstraction — code depends on this, not the impl
+├── DataTransferObjects/
+│   └── CreateUserData.php              # PHP 8.2 readonly — typed input, no raw arrays
+├── Enums/
+│   └── UserRole.php                    # Backed enum: admin | manager | user
+├── Exceptions/
+│   ├── DuplicateEmailException.php     # Domain error — maps to HTTP 409
+│   └── Handler.php                     # Renders DuplicateEmailException → JSON 409
 ├── Http/
 │   ├── Controllers/Api/
-│   │   └── UserController.php      # Slim controller — delegates to UserService
+│   │   ├── AuthController.php          # POST /api/login — returns Sanctum token
+│   │   └── UserController.php          # Slim — delegates write to Action, read to Service
+│   ├── Requests/Auth/
+│   │   └── LoginRequest.php            # Validation for POST /api/login
 │   ├── Requests/User/
-│   │   ├── CreateUserRequest.php   # Validation for POST /api/users
-│   │   └── GetUsersRequest.php     # Validation for GET /api/users
+│   │   ├── CreateUserRequest.php       # Validation for POST /api/users
+│   │   └── GetUsersRequest.php         # Validation for GET /api/users
 │   └── Resources/
-│       └── UserResource.php        # API response transformation
+│       ├── UserResource.php            # List view — no email (avoids bulk PII exposure)
+│       └── UserCreatedResource.php     # Create response — adds email as registration confirmation
 ├── Mail/
-│   ├── WelcomeUserMail.php         # Queued — sent to new user
-│   └── AdminNewUserMail.php        # Queued — sent to admin on new signup
+│   ├── WelcomeUserMail.php             # Queued — sent to new user
+│   └── AdminNewUserMail.php            # Queued — sent to admin on new signup
 ├── Models/User.php
-├── Policies/UserPolicy.php         # can_edit logic per role
-├── Repositories/UserRepository.php # All DB queries live here
-└── Services/UserService.php        # Business logic layer
+├── Policies/UserPolicy.php             # can_edit logic per role
+├── Providers/
+│   └── AppServiceProvider.php          # Binds Interface → Implementation (DI container)
+├── Repositories/
+│   └── UserRepository.php              # All DB queries, implements the interface
+└── Services/
+    └── UserService.php                 # Read-only: getActiveUsers only
 ```
 
 ---
@@ -186,10 +285,12 @@ The layering is intentional and enforced throughout:
 
 | Layer | Responsibility |
 |-------|----------------|
-| Controller | Accept request, delegate to the service, return a response. Nothing else. |
+| Controller | Accept request, delegate to Action (write) or Service (read), return a response. Nothing else. |
 | FormRequest | All input validation lives here — not in the controller, not in the service. |
-| Service | Business logic and orchestration, including mail dispatch. |
-| Repository | All Eloquent queries. The service never touches Eloquent directly. |
+| Action | Single write use-case. `CreateUserAction` owns user creation + mail dispatch. |
+| Service | Read-only orchestration. `UserService` only handles `getActiveUsers`. |
+| Repository | All Eloquent queries. Implements a contract (interface) so it can be swapped. |
+| DTO | Typed input carrier. Replaces raw `array $data` passing through layers. |
 | Policy | Authorization rules (`can_edit`). |
 | Resource | Response shaping — also ensures no sensitive fields leak into API responses. |
 

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\CreateUserAction;
+use App\DataTransferObjects\CreateUserData;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\GetUsersRequest;
+use App\Http\Resources\UserCreatedResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserService;
@@ -15,7 +18,8 @@ use Illuminate\Http\JsonResponse;
 /**
  * Slim controller — request validation and response shaping only.
  *
- * All business logic is delegated to UserService.
+ * Write path is handled by CreateUserAction (CQRS-lite).
+ * Read path is handled by UserService.
  * can_edit resolution lives here because it is a presentation-time concern
  * (it depends on who is viewing the list, not on domain rules) and requires
  * the Gate which should not be called from the Service layer.
@@ -23,7 +27,8 @@ use Illuminate\Http\JsonResponse;
 class UserController extends Controller
 {
     public function __construct(
-        private readonly UserService $userService
+        private readonly CreateUserAction $createUser,
+        private readonly UserService $userService,
     ) {}
 
     /**
@@ -31,13 +36,15 @@ class UserController extends Controller
      *
      * Create a new user. Returns the created resource with HTTP 201.
      * Welcome and admin notification emails are dispatched asynchronously
-     * inside the Service layer.
+     * inside the Action layer.
      */
     public function store(CreateUserRequest $request): JsonResponse
     {
-        $user = $this->userService->createUser($request->validated());
+        $user = $this->createUser->execute(
+            CreateUserData::fromRequest($request->validated())
+        );
 
-        return new JsonResponse(new UserResource($user), 201);
+        return new JsonResponse(new UserCreatedResource($user), 201);
     }
 
     /**
@@ -47,8 +54,7 @@ class UserController extends Controller
      *
      * can_edit is stamped onto each User model instance here — after the
      * Policy check — so that UserResource can conditionally include it.
-     * Authentication is optional on this endpoint; $request->user() may be
-     * null, in which case can_edit is simply not set.
+     * The route requires auth:sanctum so $request->user() is always present.
      */
     public function index(GetUsersRequest $request): JsonResponse
     {
