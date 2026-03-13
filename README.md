@@ -10,6 +10,7 @@ A clean starting point for building REST APIs with Laravel 12 — with slim cont
 
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
+- [Try It](#try-it)
 - [Services](#services)
 - [Postman Collection](#postman-collection)
 - [API Endpoints](#api-endpoints)
@@ -54,7 +55,34 @@ If you want some dummy data to play with, run the seeder:
 docker compose exec app php artisan db:seed
 ```
 
-This creates 1 admin (`admin@example.com`), 2 managers, 10 regular users, and 3 inactive users. All passwords are `password`.
+This creates 1 admin, 2 managers, 10 regular users, and 3 inactive users. All passwords are `password`.
+
+---
+
+## Try It
+
+Once the seeder has run, here's the full flow from zero to authenticated request:
+
+```bash
+# 1. Get a token — use any seeded account, all passwords are "password"
+curl -s -X POST http://localhost:8080/api/login \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"email":"admin@example.com","password":"password"}'
+# → copy the "token" value from the response
+
+# 2. List users (paste your token below)
+curl -s http://localhost:8080/api/users \
+  -H "Authorization: Bearer <your-token>" \
+  -H "Accept: application/json"
+
+# 3. Create a user
+curl -s -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer <your-token>" \
+  -d '{"name":"Jane Doe","email":"jane@example.com","password":"secret123"}'
+```
 
 ---
 
@@ -92,7 +120,12 @@ One thing to keep in mind: always send `Accept: application/json` on every reque
 
 ### `POST /api/login` — Get Token
 
-Required to see `can_edit` on `GET /api/users`. The seeder creates users with password `password`.
+All other endpoints require a Bearer token. Seeded accounts:
+
+| Email | Password | Role |
+|---|---|---|
+| `admin@example.com` | `password` | admin |
+| *(any seeded manager/user)* | `password` | manager / user |
 
 ```bash
 curl -s -X POST http://localhost:8080/api/login \
