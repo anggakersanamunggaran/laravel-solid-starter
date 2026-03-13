@@ -26,9 +26,10 @@ class GetUsersRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'search' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'page'   => ['sometimes', 'integer', 'min:1'],
-            'sortBy' => ['sometimes', 'string', 'in:name,email,created_at'],
+            'search'    => ['sometimes', 'nullable', 'string', 'max:100'],
+            'page'      => ['sometimes', 'integer', 'min:1'],
+            'sortBy'    => ['sometimes', 'string', 'in:name,email,created_at'],
+            'sortOrder' => ['sometimes', 'string', 'in:asc,desc'],
         ];
     }
 }

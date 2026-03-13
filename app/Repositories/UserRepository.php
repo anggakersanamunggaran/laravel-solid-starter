@@ -64,7 +64,7 @@ class UserRepository implements UserRepositoryInterface
                 })
             )
             ->withCount('orders')
-            ->orderBy($filters['sortBy'] ?? 'created_at')
+            ->orderBy($filters['sortBy'] ?? 'created_at', $filters['sortOrder'] ?? 'asc')
             ->paginate(15);
     }
 }

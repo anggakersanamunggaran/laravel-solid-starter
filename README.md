@@ -206,11 +206,12 @@ curl -s "http://localhost:8080/api/users?search=john&sortBy=name&page=1" \
 
 Supported query params:
 
-| Param    | Default       | Description                              |
-|----------|--------------|------------------------------------------|
-| `search` | —            | Filter by name or email                  |
-| `page`   | `1`          | Page number                              |
-| `sortBy` | `created_at` | Accepted values: `name`, `email`, `created_at` |
+| Param       | Default       | Description                                    |
+|-------------|---------------|------------------------------------------------|
+| `search`    | —             | Filter by name or email                        |
+| `page`      | `1`           | Page number                                    |
+| `sortBy`    | `created_at`  | `name`, `email`, `created_at`                  |
+| `sortOrder` | `asc`         | `asc` or `desc`                                |
 
 **Response `200 OK`:**
 ```json
@@ -220,6 +221,7 @@ Supported query params:
     {
       "id": 1,
       "name": "John Doe",
+      "email": "john@example.com",
       "role": "user",
       "created_at": "2024-11-25T12:34:56+00:00",
       "orders_count": 3,
@@ -228,8 +230,6 @@ Supported query params:
   ]
 }
 ```
-
-`email` is intentionally absent — bulk-listing emails is a PII risk. The `id` remains so the frontend can link to a user's profile page.
 
 ---
 
@@ -295,8 +295,8 @@ app/
 │   │   ├── CreateUserRequest.php       # Validation for POST /api/users
 │   │   └── GetUsersRequest.php         # Validation for GET /api/users
 │   └── Resources/
-│       ├── UserResource.php            # List view — no email (avoids bulk PII exposure)
-│       └── UserCreatedResource.php     # Create response — adds email as registration confirmation
+│       ├── UserResource.php            # List view — full user shape including email
+│       └── UserCreatedResource.php     # Create response — extends UserResource
 ├── Mail/
 │   ├── WelcomeUserMail.php             # Queued — sent to new user
 │   └── AdminNewUserMail.php            # Queued — sent to admin on new signup
